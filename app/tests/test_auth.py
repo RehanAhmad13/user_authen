@@ -10,6 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 from app.main import app
 from app.database.session import Base
 from app.core.dependencies import get_db
+from app.core.security import decode_token
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(
@@ -151,3 +152,40 @@ def test_admin_role_ignored_and_validations(client):
         json={"username": "dave", "email": "dave@example.com", "password": "short"},
     )
     assert res.status_code == 400
+
+
+def test_refresh_endpoint_requires_refresh_token(client):
+    client.post(
+        "/auth/register",
+        json={"username": "frank", "email": "frank@example.com", "password": "secret123"},
+    )
+    res = client.post(
+        "/auth/login",
+        json={"email": "frank@example.com", "password": "secret123"},
+    )
+    tokens = res.json()
+
+    # Attempt refresh using access token should fail
+    access_headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    res = client.post("/auth/refresh", headers=access_headers)
+    assert res.status_code == 401
+
+
+def test_refresh_generates_new_identifier(client):
+    client.post(
+        "/auth/register",
+        json={"username": "gina", "email": "gina@example.com", "password": "secret123"},
+    )
+    res = client.post(
+        "/auth/login",
+        json={"email": "gina@example.com", "password": "secret123"},
+    )
+    tokens = res.json()
+    orig_jti = decode_token(tokens["refresh_token"])["jti"]
+
+    refresh_headers = {"Authorization": f"Bearer {tokens['refresh_token']}"}
+    res = client.post("/auth/refresh", headers=refresh_headers)
+    assert res.status_code == 200
+    new_tokens = res.json()
+    new_jti = decode_token(new_tokens["refresh_token"])["jti"]
+    assert new_jti != orig_jti
