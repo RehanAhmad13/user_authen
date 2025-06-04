@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.modules.auth.schemas import UserCreate, UserOut, Token, LoginRequest
 
@@ -9,7 +9,7 @@ from app.core.dependencies import (
     oauth2_scheme,
 )
 from app.modules.auth.services import create_user, login_user, generate_tokens
-from app.core.security import revoke_token
+from app.core.security import revoke_token, decode_token
 from app.database.models import User
 
 
@@ -32,7 +32,20 @@ def refresh(current_user: User = Depends(get_current_user_from_refresh_token)):
 
 
 @router.post("/logout")
-def logout(token: str = Depends(oauth2_scheme)):
+def logout(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+):
+    payload = decode_token(token)
+    token_type = payload.get("type")
+    user_id = payload.get("sub")
+
+    if token_type not in {"access", "refresh"} or user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    user = db.query(User).filter(User.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
     revoke_token(token)
     return {"detail": "Token revoked"}
 

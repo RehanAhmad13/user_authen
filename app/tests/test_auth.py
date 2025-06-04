@@ -11,6 +11,9 @@ from app.main import app
 from app.database.session import Base
 from app.core.dependencies import get_db
 from app.core.security import decode_token
+from jose import jwt
+from datetime import datetime, timedelta
+from app.core.config import settings
 from app.database.models import User
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
@@ -216,3 +219,45 @@ def test_refresh_generates_new_identifier(client):
     new_tokens = res.json()
     new_jti = decode_token(new_tokens["refresh_token"])["jti"]
     assert new_jti != orig_jti
+
+
+def test_logout_rejects_invalid_token_type(client):
+    client.post(
+        "/auth/register",
+        json={"username": "henry", "email": "henry@example.com", "password": "secret123"},
+    )
+
+    payload = {
+        "sub": "1",
+        "type": "invalid",
+        "jti": "x",
+        "exp": datetime.utcnow() + timedelta(minutes=5),
+    }
+    invalid_token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    res = client.post(
+        "/auth/logout",
+        headers={"Authorization": f"Bearer {invalid_token}"},
+    )
+    assert res.status_code == 401
+
+
+def test_logout_rejects_unknown_user(client):
+    client.post(
+        "/auth/register",
+        json={"username": "iris", "email": "iris@example.com", "password": "secret123"},
+    )
+
+    payload = {
+        "sub": "9999",
+        "type": "access",
+        "jti": "y",
+        "exp": datetime.utcnow() + timedelta(minutes=5),
+    }
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    res = client.post(
+        "/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert res.status_code == 401
