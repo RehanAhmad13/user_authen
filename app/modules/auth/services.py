@@ -61,6 +61,8 @@ def login_user(email: str, password: str, db: Session) -> dict:
         )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    if not user.is_verified:
+        raise HTTPException(status_code=400, detail="Email not verified")
     return generate_tokens(user)
 
 
@@ -70,9 +72,26 @@ def _get_or_create_oauth_user(email: str, username: str, db: Session) -> User:
         return user
     dummy_password = uuid4().hex + "A1"  # ensures password validation
     user_in = UserCreate(username=username, email=email, password=dummy_password)
-    return repository.create_user(db, user_in)
+    user = repository.create_user(db, user_in)
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def oauth_login(email: str, username: str, db: Session) -> dict:
     user = _get_or_create_oauth_user(email, username, db)
     return generate_tokens(user)
+
+
+def verify_email(token: str, db: Session) -> User:
+    """Verify a user's email using the provided token."""
+    user = db.query(User).filter(User.verification_token == token).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    user.is_verified = True
+    user.verification_token = None
+    db.commit()
+    db.refresh(user)
+    return user
