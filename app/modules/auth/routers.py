@@ -1,12 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.dependencies import get_db, get_current_user, oauth2_scheme
 from app.modules.auth.schemas import UserCreate, UserOut, Token
-from app.modules.auth.services import create_user, authenticate_user
+from app.modules.auth.services import create_user, login_user, generate_tokens
 from app.database.models import User
-from app.core.security import create_access_token, create_refresh_token
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -19,31 +18,15 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
 ):
-    user = authenticate_user(form_data.username, form_data.password, db)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
-        )
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(user.id)})
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
+    return login_user(form_data.username, form_data.password, db)
 
 
 @router.post("/refresh", response_model=Token)
 def refresh(current_user: User = Depends(get_current_user)):
-    access_token = create_access_token(data={"sub": str(current_user.id)})
-    refresh_token = create_refresh_token(data={"sub": str(current_user.id)})
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
+    return generate_tokens(current_user)
 
 
 @router.get("/me", response_model=UserOut)
