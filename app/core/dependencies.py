@@ -29,6 +29,8 @@ def get_current_user(
     )
     try:
         payload = decode_token(token)
+        if payload.get("type") != "access":
+            raise JWTError()
         user_id: str | None = payload.get("sub")
         if user_id is None:
             raise credentials_exception
