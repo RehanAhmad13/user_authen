@@ -39,14 +39,14 @@ def client():
 def test_register_login_me_refresh_flow(client):
     res = client.post(
         "/auth/register",
-        json={"username": "alice", "email": "alice@example.com", "password": "secret"},
+        json={"username": "alice", "email": "alice@gmail.com", "password": "Secret1!"},
     )
     assert res.status_code == 200
     user_id = res.json()["id"]
 
     res = client.post(
         "/auth/login",
-        data={"username": "alice@example.com", "password": "secret"},
+        data={"username": "alice@gmail.com", "password": "Secret1!"},
     )
     assert res.status_code == 200
     tokens = res.json()
@@ -63,3 +63,26 @@ def test_register_login_me_refresh_flow(client):
     assert res.status_code == 200
     new_tokens = res.json()
     assert new_tokens["access_token"]
+
+
+def test_register_validation(client):
+    # Invalid username (too short)
+    res = client.post(
+        "/auth/register",
+        json={"username": "ab", "email": "bob@gmail.com", "password": "Secret1!"},
+    )
+    assert res.status_code == 400
+
+    # Invalid email domain
+    res = client.post(
+        "/auth/register",
+        json={"username": "bob123", "email": "bob@example.com", "password": "Secret1!"},
+    )
+    assert res.status_code == 400
+
+    # Invalid password
+    res = client.post(
+        "/auth/register",
+        json={"username": "bob123", "email": "bob@gmail.com", "password": "short"},
+    )
+    assert res.status_code == 400
