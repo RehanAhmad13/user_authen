@@ -5,15 +5,31 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
 )
-from app.modules.auth.schemas import UserCreate
+import re
+from app.modules.auth.schemas import UserCreate, Role
 from app.database.models import User
 from . import repository
+
+PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
+
+
+def _validate_password(password: str) -> None:
+    if not PASSWORD_RE.match(password):
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be at least 8 characters long and contain both letters and numbers",
+        )
+
 
 def create_user(user_in: UserCreate, db: Session):
     if repository.get_user_by_email(db, user_in.email):
         raise HTTPException(status_code=400, detail="Email already registered")
+    if repository.get_user_by_username(db, user_in.username):
+        raise HTTPException(status_code=400, detail="Username already taken")
+    _validate_password(user_in.password)
 
-    return repository.create_user(db, user_in)
+    sanitized = user_in.copy(update={"role": Role.user})
+    return repository.create_user(db, sanitized)
 
 def authenticate_user(email: str, password: str, db: Session):
     user = repository.get_user_by_email(db, email)

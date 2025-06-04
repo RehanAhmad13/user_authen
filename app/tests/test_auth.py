@@ -39,7 +39,7 @@ def client():
 def test_register_login_me_refresh_flow(client):
     res = client.post(
         "/auth/register",
-        json={"username": "alice", "email": "alice@example.com", "password": "secret"},
+        json={"username": "alice", "email": "alice@example.com", "password": "secret123"},
     )
     assert res.status_code == 200
     data = res.json()
@@ -48,7 +48,7 @@ def test_register_login_me_refresh_flow(client):
 
     res = client.post(
         "/auth/login",
-        data={"username": "alice@example.com", "password": "secret"},
+        data={"username": "alice@example.com", "password": "secret123"},
     )
     assert res.status_code == 200
     tokens = res.json()
@@ -79,12 +79,12 @@ def test_register_login_me_refresh_flow(client):
 def test_users_endpoint_requires_token(client):
     client.post(
         "/auth/register",
-        json={"username": "bob", "email": "bob@example.com", "password": "secret"},
+        json={"username": "bob", "email": "bob@example.com", "password": "secret123"},
     )
 
     res = client.post(
         "/auth/login",
-        data={"username": "bob@example.com", "password": "secret"},
+        data={"username": "bob@example.com", "password": "secret123"},
     )
     tokens = res.json()
 
@@ -97,3 +97,36 @@ def test_users_endpoint_requires_token(client):
     )
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+def test_admin_role_ignored_and_validations(client):
+    # Attempt to register as admin should result in normal user role
+    res = client.post(
+        "/auth/register",
+        json={
+            "username": "charlie",
+            "email": "charlie@example.com",
+            "password": "complex123",
+            "role": "admin",
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["role"] == "user"
+
+    # Duplicate username should fail
+    res = client.post(
+        "/auth/register",
+        json={
+            "username": "charlie",
+            "email": "other@example.com",
+            "password": "complex123",
+        },
+    )
+    assert res.status_code == 400
+
+    # Weak password should fail
+    res = client.post(
+        "/auth/register",
+        json={"username": "dave", "email": "dave@example.com", "password": "short"},
+    )
+    assert res.status_code == 400
