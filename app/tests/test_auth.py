@@ -261,3 +261,29 @@ def test_logout_rejects_unknown_user(client):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert res.status_code == 401
+
+
+def test_google_oauth_login(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.modules.auth.routers.fetch_google_user",
+        lambda code: ("g@example.com", "guser"),
+    )
+    res = client.post("/auth/google", json={"code": "dummy"})
+    assert res.status_code == 200
+    tokens = res.json()
+    res = client.get("/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    assert res.status_code == 200
+    assert res.json()["email"] == "g@example.com"
+
+
+def test_facebook_oauth_login(client, monkeypatch):
+    monkeypatch.setattr(
+        "app.modules.auth.routers.fetch_facebook_user",
+        lambda code: ("f@example.com", "fuser"),
+    )
+    res = client.post("/auth/facebook", json={"code": "dummy"})
+    assert res.status_code == 200
+    tokens = res.json()
+    res = client.get("/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    assert res.status_code == 200
+    assert res.json()["email"] == "f@example.com"

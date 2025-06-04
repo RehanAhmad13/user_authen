@@ -9,6 +9,7 @@ import re
 from app.modules.auth.schemas import UserCreate, Role
 from app.database.models import User
 from . import repository
+from uuid import uuid4
 
 PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
 
@@ -60,4 +61,18 @@ def login_user(email: str, password: str, db: Session) -> dict:
         )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    return generate_tokens(user)
+
+
+def _get_or_create_oauth_user(email: str, username: str, db: Session) -> User:
+    user = repository.get_user_by_email(db, email)
+    if user:
+        return user
+    dummy_password = uuid4().hex + "A1"  # ensures password validation
+    user_in = UserCreate(username=username, email=email, password=dummy_password)
+    return repository.create_user(db, user_in)
+
+
+def oauth_login(email: str, username: str, db: Session) -> dict:
+    user = _get_or_create_oauth_user(email, username, db)
     return generate_tokens(user)
