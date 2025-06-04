@@ -42,7 +42,9 @@ def test_register_login_me_refresh_flow(client):
         json={"username": "alice", "email": "alice@example.com", "password": "secret"},
     )
     assert res.status_code == 200
-    user_id = res.json()["id"]
+    data = res.json()
+    user_id = data["id"]
+    assert data["role"] == "user"
 
     res = client.post(
         "/auth/login",
@@ -63,6 +65,15 @@ def test_register_login_me_refresh_flow(client):
     assert res.status_code == 200
     new_tokens = res.json()
     assert new_tokens["access_token"]
+
+    # logout and ensure token revoked
+    res = client.post(
+        "/auth/logout", headers={"Authorization": f"Bearer {tokens['access_token']}"}
+    )
+    assert res.status_code == 200
+
+    res = client.get("/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
+    assert res.status_code == 401
 
 
 def test_users_endpoint_requires_token(client):
