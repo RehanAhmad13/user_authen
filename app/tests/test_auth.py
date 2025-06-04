@@ -99,6 +99,27 @@ def test_users_endpoint_requires_token(client):
     assert isinstance(res.json(), list)
 
 
+def test_refresh_token_cannot_access_protected_routes(client):
+    client.post(
+        "/auth/register",
+        json={"username": "eve", "email": "eve@example.com", "password": "secret123"},
+    )
+
+    res = client.post(
+        "/auth/login",
+        json={"email": "eve@example.com", "password": "secret123"},
+    )
+    tokens = res.json()
+
+    refresh_headers = {"Authorization": f"Bearer {tokens['refresh_token']}"}
+
+    res = client.get("/auth/me", headers=refresh_headers)
+    assert res.status_code == 401
+
+    res = client.get("/users/", headers=refresh_headers)
+    assert res.status_code == 401
+
+
 def test_admin_role_ignored_and_validations(client):
     # Attempt to register as admin should result in normal user role
     res = client.post(
