@@ -8,3 +8,4 @@ python-dotenv
 alembic
 pandas==2.2.3
 social-auth-core
+pyotp

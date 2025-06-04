@@ -1,7 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.modules.auth.schemas import UserCreate, UserOut, Token, LoginRequest
-from app.modules.auth.schemas import VerifyRequest
+from app.modules.auth.schemas import (
+    UserCreate,
+    UserOut,
+    Token,
+    LoginRequest,
+    VerifyRequest,
+    OTPRequest,
+    TwoFactorSecretOut,
+)
 
 from app.core.dependencies import (
     get_db,
@@ -15,6 +22,9 @@ from app.modules.auth.services import (
     generate_tokens,
     oauth_login,
     verify_email,
+    setup_two_factor,
+    enable_two_factor,
+    disable_two_factor,
 )
 from app.modules.auth.social import fetch_google_user, fetch_facebook_user
 from app.core.security import revoke_token, decode_token
@@ -36,7 +46,7 @@ def verify(request: VerifyRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    return login_user(credentials.email, credentials.password, db)
+    return login_user(credentials.email, credentials.password, db, credentials.otp)
 
 
 @router.post("/google", response_model=Token)
@@ -60,6 +70,32 @@ def facebook_login(payload: dict, db: Session = Depends(get_db)):
 @router.post("/refresh", response_model=Token)
 def refresh(current_user: User = Depends(get_current_user_from_refresh_token)):
     return generate_tokens(current_user)
+
+
+@router.post("/2fa/setup", response_model=TwoFactorSecretOut)
+def two_factor_setup(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    secret = setup_two_factor(current_user, db)
+    return {"secret": secret}
+
+
+@router.post("/2fa/enable", response_model=UserOut)
+def two_factor_enable(
+    otp: OTPRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return enable_two_factor(current_user, otp.otp, db)
+
+
+@router.post("/2fa/disable", response_model=UserOut)
+def two_factor_disable(
+    otp: OTPRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return disable_two_factor(current_user, otp.otp, db)
 
 
 @router.post("/logout")

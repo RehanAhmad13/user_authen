@@ -17,3 +17,5 @@ class User(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     is_verified = Column(Boolean, nullable=False, default=False)
     verification_token = Column(String, unique=True, nullable=True)
+    two_factor_secret = Column(String, nullable=True)
+    two_factor_enabled = Column(Boolean, nullable=False, default=False)
