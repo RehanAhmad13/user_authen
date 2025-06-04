@@ -1,11 +1,13 @@
 from typing import List
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_admin
+from app.core.dependencies import get_db, require_admin, get_current_user
 from app.modules.auth.schemas import UserOut
 from app.database.models import User
 from app.modules.auth import repository
+from app.modules.audit.repository import get_logs_for_user
+from app.modules.audit.schemas import ActivityLogOut
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -15,3 +17,14 @@ def list_users(
     _: User = Depends(require_admin),
 ):
     return repository.list_users(db)
+
+
+@router.get("/{user_id}/logs", response_model=List[ActivityLogOut])
+def user_logs(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin" and current_user.id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+    return get_logs_for_user(db, user_id)

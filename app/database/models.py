@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from datetime import datetime
 from app.database.session import Base
 
 
@@ -19,3 +20,12 @@ class User(Base):
     verification_token = Column(String, unique=True, nullable=True)
     two_factor_secret = Column(String, nullable=True)
     two_factor_enabled = Column(Boolean, nullable=False, default=False)
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    action = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)

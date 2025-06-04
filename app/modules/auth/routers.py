@@ -114,6 +114,8 @@ def logout(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     revoke_token(token)
+    from app.modules.audit.repository import create_log
+    create_log(db, user.id, "logout")
     return {"detail": "Token revoked"}
 
 

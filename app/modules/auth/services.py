@@ -10,6 +10,7 @@ from app.modules.auth.schemas import UserCreate, Role
 import pyotp
 from app.database.models import User
 from . import repository
+from app.modules.audit import repository as audit_repository
 from uuid import uuid4
 
 PASSWORD_RE = re.compile(r"^(?=.*[A-Za-z])(?=.*\d).{8,}$")
@@ -31,7 +32,9 @@ def create_user(user_in: UserCreate, db: Session):
     _validate_password(user_in.password)
 
     sanitized = user_in.copy(update={"role": Role.user})
-    return repository.create_user(db, sanitized)
+    user = repository.create_user(db, sanitized)
+    audit_repository.create_log(db, user.id, "register")
+    return user
 
 def authenticate_user(email: str, password: str, db: Session):
     user = repository.get_user_by_email(db, email)
@@ -59,6 +62,7 @@ def setup_two_factor(user: User, db: Session) -> str:
     user.two_factor_enabled = False
     db.commit()
     db.refresh(user)
+    audit_repository.create_log(db, user.id, "2fa_setup")
     return secret
 
 
@@ -71,6 +75,7 @@ def enable_two_factor(user: User, otp: str, db: Session) -> User:
     user.two_factor_enabled = True
     db.commit()
     db.refresh(user)
+    audit_repository.create_log(db, user.id, "2fa_enable")
     return user
 
 
@@ -84,6 +89,7 @@ def disable_two_factor(user: User, otp: str, db: Session) -> User:
     user.two_factor_enabled = False
     db.commit()
     db.refresh(user)
+    audit_repository.create_log(db, user.id, "2fa_disable")
     return user
 
 
@@ -104,6 +110,7 @@ def login_user(email: str, password: str, db: Session, otp: str | None = None) -
         totp = pyotp.TOTP(user.two_factor_secret)
         if not totp.verify(otp):
             raise HTTPException(status_code=400, detail="Invalid OTP")
+    audit_repository.create_log(db, user.id, "login")
     return generate_tokens(user)
 
 
@@ -118,11 +125,13 @@ def _get_or_create_oauth_user(email: str, username: str, db: Session) -> User:
     user.verification_token = None
     db.commit()
     db.refresh(user)
+    audit_repository.create_log(db, user.id, "register")
     return user
 
 
 def oauth_login(email: str, username: str, db: Session) -> dict:
     user = _get_or_create_oauth_user(email, username, db)
+    audit_repository.create_log(db, user.id, "oauth_login")
     return generate_tokens(user)
 
 
@@ -135,4 +144,5 @@ def verify_email(token: str, db: Session) -> User:
     user.verification_token = None
     db.commit()
     db.refresh(user)
+    audit_repository.create_log(db, user.id, "verify_email")
     return user
