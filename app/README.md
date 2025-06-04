@@ -20,7 +20,7 @@ uvicorn app.main:app --reload
 
 ## Endpoints
 - `POST /auth/register` – Create a new user.
-- `POST /auth/login` – Authenticate and obtain JWT access and refresh tokens using the OAuth2 password flow.
+- `POST /auth/login` – Authenticate with email/password and receive JWT access and refresh tokens.
 - `POST /auth/refresh` – Refresh expired access tokens using a valid refresh token.
 - `GET /auth/me` – Retrieve the currently authenticated user.
 
