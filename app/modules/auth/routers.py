@@ -5,7 +5,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from app.core.dependencies import get_db, get_current_user, oauth2_scheme
 from app.modules.auth.schemas import UserCreate, UserOut, Token
 from app.modules.auth.services import create_user, authenticate_user
-from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.database.models import User
+from app.core.security import create_access_token, create_refresh_token
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -35,11 +36,9 @@ def login(
 
 
 @router.post("/refresh", response_model=Token)
-def refresh(token: str = Depends(oauth2_scheme)):
-    payload = decode_token(token)
-    user_id = payload.get("sub")
-    access_token = create_access_token(data={"sub": user_id})
-    refresh_token = create_refresh_token(data={"sub": user_id})
+def refresh(current_user: User = Depends(get_current_user)):
+    access_token = create_access_token(data={"sub": str(current_user.id)})
+    refresh_token = create_refresh_token(data={"sub": str(current_user.id)})
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
