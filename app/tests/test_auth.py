@@ -11,6 +11,7 @@ from app.main import app
 from app.database.session import Base
 from app.core.dependencies import get_db
 from app.core.security import decode_token
+from app.database.models import User
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(
@@ -77,7 +78,7 @@ def test_register_login_me_refresh_flow(client):
     assert res.status_code == 401
 
 
-def test_users_endpoint_requires_token(client):
+def test_users_endpoint_requires_admin(client):
     client.post(
         "/auth/register",
         json={"username": "bob", "email": "bob@example.com", "password": "secret123"},
@@ -91,6 +92,32 @@ def test_users_endpoint_requires_token(client):
 
     res = client.get("/users/")
     assert res.status_code == 401
+
+    res = client.get(
+        "/users/",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert res.status_code == 403
+
+
+def test_admin_can_access_users_endpoint(client):
+    client.post(
+        "/auth/register",
+        json={"username": "admin", "email": "admin@example.com", "password": "secret123"},
+    )
+
+    # elevate user to admin role
+    db = TestingSessionLocal()
+    user = db.query(User).filter_by(email="admin@example.com").first()
+    user.role = "admin"
+    db.commit()
+    db.close()
+
+    res = client.post(
+        "/auth/login",
+        json={"email": "admin@example.com", "password": "secret123"},
+    )
+    tokens = res.json()
 
     res = client.get(
         "/users/",
