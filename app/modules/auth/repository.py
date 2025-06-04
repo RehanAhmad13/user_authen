@@ -2,6 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.database.models import User
+from uuid import uuid4
 from app.core.security import hash_password
 from .schemas import UserCreate
 
@@ -34,6 +35,8 @@ def create_user(db: Session, user_in: UserCreate) -> User:
         hashed_password=hash_password(user_in.password),
         role=user_in.role.value,
         is_active=True,
+        is_verified=False,
+        verification_token=uuid4().hex,
     )
     db.add(user)
     db.commit()

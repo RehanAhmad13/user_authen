@@ -41,6 +41,27 @@ def client():
     Base.metadata.drop_all(bind=engine)
 
 
+def verify_latest_user(client, email: str):
+    db = TestingSessionLocal()
+    token = db.query(User).filter_by(email=email).first().verification_token
+    db.close()
+    res = client.post("/auth/verify", json={"token": token})
+    assert res.status_code == 200
+
+
+def test_login_fails_if_not_verified(client):
+    client.post(
+        "/auth/register",
+        json={"username": "unv", "email": "unv@example.com", "password": "secret123"},
+    )
+    res = client.post(
+        "/auth/login",
+        json={"email": "unv@example.com", "password": "secret123"},
+    )
+    assert res.status_code == 400
+    verify_latest_user(client, "unv@example.com")
+
+
 def test_register_login_me_refresh_flow(client):
     res = client.post(
         "/auth/register",
@@ -50,6 +71,8 @@ def test_register_login_me_refresh_flow(client):
     data = res.json()
     user_id = data["id"]
     assert data["role"] == "user"
+
+    verify_latest_user(client, "alice@example.com")
 
     res = client.post(
         "/auth/login",
@@ -87,6 +110,8 @@ def test_users_endpoint_requires_admin(client):
         json={"username": "bob", "email": "bob@example.com", "password": "secret123"},
     )
 
+    verify_latest_user(client, "bob@example.com")
+
     res = client.post(
         "/auth/login",
         json={"email": "bob@example.com", "password": "secret123"},
@@ -108,6 +133,8 @@ def test_admin_can_access_users_endpoint(client):
         "/auth/register",
         json={"username": "admin", "email": "admin@example.com", "password": "secret123"},
     )
+
+    verify_latest_user(client, "admin@example.com")
 
     # elevate user to admin role
     db = TestingSessionLocal()
@@ -135,6 +162,8 @@ def test_refresh_token_cannot_access_protected_routes(client):
         "/auth/register",
         json={"username": "eve", "email": "eve@example.com", "password": "secret123"},
     )
+
+    verify_latest_user(client, "eve@example.com")
 
     res = client.post(
         "/auth/login",
@@ -189,6 +218,8 @@ def test_refresh_endpoint_requires_refresh_token(client):
         "/auth/register",
         json={"username": "frank", "email": "frank@example.com", "password": "secret123"},
     )
+
+    verify_latest_user(client, "frank@example.com")
     res = client.post(
         "/auth/login",
         json={"email": "frank@example.com", "password": "secret123"},
@@ -206,6 +237,8 @@ def test_refresh_generates_new_identifier(client):
         "/auth/register",
         json={"username": "gina", "email": "gina@example.com", "password": "secret123"},
     )
+
+    verify_latest_user(client, "gina@example.com")
     res = client.post(
         "/auth/login",
         json={"email": "gina@example.com", "password": "secret123"},

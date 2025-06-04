@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.modules.auth.schemas import UserCreate, UserOut, Token, LoginRequest
+from app.modules.auth.schemas import VerifyRequest
 
 from app.core.dependencies import (
     get_db,
@@ -13,6 +14,7 @@ from app.modules.auth.services import (
     login_user,
     generate_tokens,
     oauth_login,
+    verify_email,
 )
 from app.modules.auth.social import fetch_google_user, fetch_facebook_user
 from app.core.security import revoke_token, decode_token
@@ -25,6 +27,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=UserOut)
 def register(user: UserCreate, db: Session = Depends(get_db)):
     return create_user(user, db)
+
+
+@router.post("/verify", response_model=UserOut)
+def verify(request: VerifyRequest, db: Session = Depends(get_db)):
+    return verify_email(request.token, db)
 
 
 @router.post("/login", response_model=Token)

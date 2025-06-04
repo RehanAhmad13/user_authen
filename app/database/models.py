@@ -15,3 +15,5 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, nullable=False, default=UserRole.USER)
     is_active = Column(Boolean, nullable=False, default=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    verification_token = Column(String, unique=True, nullable=True)
