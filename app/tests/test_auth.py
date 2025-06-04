@@ -15,6 +15,7 @@ from jose import jwt
 from datetime import datetime, timedelta
 from app.core.config import settings
 from app.database.models import User
+import pyotp
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(
@@ -320,3 +321,52 @@ def test_facebook_oauth_login(client, monkeypatch):
     res = client.get("/auth/me", headers={"Authorization": f"Bearer {tokens['access_token']}"})
     assert res.status_code == 200
     assert res.json()["email"] == "f@example.com"
+
+
+def test_two_factor_auth_flow(client):
+    client.post(
+        "/auth/register",
+        json={"username": "otp", "email": "otp@example.com", "password": "secret123"},
+    )
+
+    verify_latest_user(client, "otp@example.com")
+
+    res = client.post(
+        "/auth/login",
+        json={"email": "otp@example.com", "password": "secret123"},
+    )
+    tokens = res.json()
+
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    setup_res = client.post("/auth/2fa/setup", headers=headers)
+    secret = setup_res.json()["secret"]
+    otp_code = pyotp.TOTP(secret).now()
+    enable_res = client.post(
+        "/auth/2fa/enable",
+        json={"otp": otp_code},
+        headers=headers,
+    )
+    assert enable_res.status_code == 200
+
+    res = client.post(
+        "/auth/login",
+        json={"email": "otp@example.com", "password": "secret123"},
+    )
+    assert res.status_code == 400
+
+    res = client.post(
+        "/auth/login",
+        json={
+            "email": "otp@example.com",
+            "password": "secret123",
+            "otp": pyotp.TOTP(secret).now(),
+        },
+    )
+    assert res.status_code == 200
+    new_tokens = res.json()
+    disable_res = client.post(
+        "/auth/2fa/disable",
+        json={"otp": pyotp.TOTP(secret).now()},
+        headers={"Authorization": f"Bearer {new_tokens['access_token']}"},
+    )
+    assert disable_res.status_code == 200

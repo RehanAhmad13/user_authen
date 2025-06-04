@@ -34,7 +34,16 @@ class Token(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    otp: str | None = None
 
 
 class VerifyRequest(BaseModel):
     token: str
+
+
+class OTPRequest(BaseModel):
+    otp: str
+
+
+class TwoFactorSecretOut(BaseModel):
+    secret: str

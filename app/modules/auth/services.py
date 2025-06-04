@@ -7,6 +7,7 @@ from app.core.security import (
 )
 import re
 from app.modules.auth.schemas import UserCreate, Role
+import pyotp
 from app.database.models import User
 from . import repository
 from uuid import uuid4
@@ -52,7 +53,41 @@ def generate_tokens(user: User) -> dict:
     }
 
 
-def login_user(email: str, password: str, db: Session) -> dict:
+def setup_two_factor(user: User, db: Session) -> str:
+    secret = pyotp.random_base32()
+    user.two_factor_secret = secret
+    user.two_factor_enabled = False
+    db.commit()
+    db.refresh(user)
+    return secret
+
+
+def enable_two_factor(user: User, otp: str, db: Session) -> User:
+    if not user.two_factor_secret:
+        raise HTTPException(status_code=400, detail="2FA not configured")
+    totp = pyotp.TOTP(user.two_factor_secret)
+    if not totp.verify(otp):
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    user.two_factor_enabled = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def disable_two_factor(user: User, otp: str, db: Session) -> User:
+    if not user.two_factor_secret or not user.two_factor_enabled:
+        raise HTTPException(status_code=400, detail="2FA not enabled")
+    totp = pyotp.TOTP(user.two_factor_secret)
+    if not totp.verify(otp):
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    user.two_factor_secret = None
+    user.two_factor_enabled = False
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def login_user(email: str, password: str, db: Session, otp: str | None = None) -> dict:
     """Authenticate the user and return JWT tokens."""
     user = authenticate_user(email, password, db)
     if not user:
@@ -63,6 +98,12 @@ def login_user(email: str, password: str, db: Session) -> dict:
         raise HTTPException(status_code=400, detail="Inactive user")
     if not user.is_verified:
         raise HTTPException(status_code=400, detail="Email not verified")
+    if user.two_factor_enabled:
+        if not otp:
+            raise HTTPException(status_code=400, detail="OTP required")
+        totp = pyotp.TOTP(user.two_factor_secret)
+        if not totp.verify(otp):
+            raise HTTPException(status_code=400, detail="Invalid OTP")
     return generate_tokens(user)
 
 
