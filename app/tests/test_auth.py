@@ -48,7 +48,7 @@ def test_register_login_me_refresh_flow(client):
 
     res = client.post(
         "/auth/login",
-        data={"username": "alice@example.com", "password": "secret123"},
+        json={"email": "alice@example.com", "password": "secret123"},
     )
     assert res.status_code == 200
     tokens = res.json()
@@ -84,7 +84,7 @@ def test_users_endpoint_requires_token(client):
 
     res = client.post(
         "/auth/login",
-        data={"username": "bob@example.com", "password": "secret123"},
+        json={"email": "bob@example.com", "password": "secret123"},
     )
     tokens = res.json()
 

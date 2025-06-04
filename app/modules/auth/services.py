@@ -41,8 +41,12 @@ def authenticate_user(email: str, password: str, db: Session):
 def generate_tokens(user: User) -> dict:
     """Return a new access and refresh token pair for the given user."""
     return {
-        "access_token": create_access_token(data={"sub": str(user.id)}),
-        "refresh_token": create_refresh_token(data={"sub": str(user.id)}),
+        "access_token": create_access_token(
+            data={"sub": str(user.id), "role": user.role}
+        ),
+        "refresh_token": create_refresh_token(
+            data={"sub": str(user.id), "role": user.role}
+        ),
         "token_type": "bearer",
     }
 
@@ -54,4 +58,6 @@ def login_user(email: str, password: str, db: Session) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
     return generate_tokens(user)
