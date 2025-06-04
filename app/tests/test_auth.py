@@ -63,3 +63,26 @@ def test_register_login_me_refresh_flow(client):
     assert res.status_code == 200
     new_tokens = res.json()
     assert new_tokens["access_token"]
+
+
+def test_users_endpoint_requires_token(client):
+    client.post(
+        "/auth/register",
+        json={"username": "bob", "email": "bob@example.com", "password": "secret"},
+    )
+
+    res = client.post(
+        "/auth/login",
+        data={"username": "bob@example.com", "password": "secret"},
+    )
+    tokens = res.json()
+
+    res = client.get("/users/")
+    assert res.status_code == 401
+
+    res = client.get(
+        "/users/",
+        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+    )
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
