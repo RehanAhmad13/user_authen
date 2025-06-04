@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.database.session import SessionLocal
-from app.database.models import User
+from app.database.models import User, UserRole
 from app.core.security import decode_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -65,3 +65,13 @@ def get_current_user_from_refresh_token(
     if user is None:
         raise credentials_exception
     return user
+
+
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Ensure the current user has admin privileges."""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
